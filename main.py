@@ -1,6 +1,7 @@
 # Intended to be used in @InfiniDee only
 
 import config
+import mysql.connector
 import logging
 import time
 from functools import wraps
@@ -12,6 +13,16 @@ logging.basicConfig(level=logging.INFO,
 logger = logging.getLogger(__name__)
 admin_cache = {}
 cache_timeouts = {}
+db_conn = mysql.connector.connect(
+    host=config.DB_HOST,
+    user=config.DB_USER,
+    passwd=config.DB_PASS,
+    database=config.DB_NAME,
+    pool_size=4,
+    pool_name="infinidee",
+    auth_plugin='mysql_native_password',
+)
+db_cursor = db_conn.cursor()
 
 
 def get_admin_ids(bot, chat_id):
@@ -41,6 +52,7 @@ def restricted(func):
                 logger.log(logging.INFO, "Unauthorized access to /{} denied for {}.".format(func.__name__, user_id))
                 return
         return func(update, context, *args, **kwargs)
+
     return wrapped
 
 
@@ -55,12 +67,46 @@ def cmd_id(update: Update, context: CallbackContext):
         reply(message, context.bot, f'Sender ID: <code>{message.reply_to_message.from_user.id}</code>')
     else:
         reply(message, context.bot, f'Your ID: <code>{message.from_user.id}</code>\n'
-              f'Group ID: <code>{message.chat_id}</code>')
+                                    f'Group ID: <code>{message.chat_id}</code>')
     pass
 
 
 def cmd_start(update: Update, context: CallbackContext):
     update.message.reply_text('start!', quote=True)
+
+
+def cmd_bulletin(update: Update, context: CallbackContext):
+    chat_id = update.effective_chat.id
+    user_id = update.effective_user.id
+    if update.message.reply_to_message:
+        if user_id in get_admin_ids(context.bot, chat_id):
+            # add message to bulletin
+            text = update.message.text.split(' ')
+            time_limit = 604800  # 1 week
+            if len(text) > 1:
+                try:
+                    time_limit = int(text[1])
+                except ValueError:
+                    reply(update.message, context.bot, f'{text[1]} is not a valid number')
+                    return
+            print(len([chat_id, update.message.reply_to_message.text, time_limit + time.time()]))
+            db_cursor.execute("INSERT INTO bulletin (gid, content, expires) values (%s, %s, %s + unix_timestamp())",
+                              [chat_id, update.message.reply_to_message.text, time_limit])
+            db_conn.commit()
+            print(db_cursor.fetchwarnings())
+            reply(update.message, context.bot, "Added to bulletin")
+            return
+    db_cursor.execute("SELECT content from bulletin where gid=%s and expires>unix_timestamp()", [chat_id])
+    result = db_cursor.fetchall()
+    bulletin = '布告板：\n'
+    i = 1
+    for x in result:
+        bulletin += f'{i}. '
+        bulletin += x[0]
+        bulletin += '\n\n'
+        i += 1
+    if len(result) > 0:
+        reply(update.message, context.bot, bulletin)
 
 
 # mod commands
@@ -113,6 +159,7 @@ def main():
     updater.dispatcher.add_handler(CommandHandler('kick', cmd_kick))
     updater.dispatcher.add_handler(CommandHandler('mute', cmd_mute))
     updater.dispatcher.add_handler(CommandHandler('unmute', cmd_unmute))
+    updater.dispatcher.add_handler(CommandHandler('bulletin', cmd_bulletin))
     # updater.dispatcher.add_handler()
 
     updater.start_polling()
