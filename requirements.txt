@@ -1,0 +1,2 @@
+mysql-connector==2.2.9
+python-telegram-bot==12.2.0
