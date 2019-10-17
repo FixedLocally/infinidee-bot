@@ -1,0 +1,3 @@
+# config.py
+BOT_TOKEN = "INSERT-TOKEN-HERE"
+OWNER_ID = 0
