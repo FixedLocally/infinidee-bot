@@ -2,22 +2,44 @@
 
 import config
 import logging
+import time
 from functools import wraps
-from telegram import Update, Message, Bot, ChatPermissions
+from telegram import Update, Message, Bot, ChatPermissions, ChatMember
 from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters, CallbackContext)
 
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+admin_cache = {}
+cache_timeouts = {}
+
+
+def get_admin_ids(bot, chat_id):
+    now = time.time()
+    try:
+        cache = admin_cache[chat_id]
+        timeout = cache_timeouts[chat_id]
+        if timeout > now:
+            return cache
+        else:
+            raise KeyError
+    except KeyError:
+        admins = [admin.user.id for admin in bot.get_chat_administrators(chat_id)]
+        admin_cache[chat_id] = admins
+        cache_timeouts[chat_id] = now + 3600
+        return admins
 
 
 def restricted(func):
     @wraps(func)
-    def wrapped(update, context, *args, **kwargs):
+    def wrapped(update: Update, context: CallbackContext, *args, **kwargs):
         user_id = update.effective_user.id
+        chat_id = update.effective_chat.id
         if user_id != config.OWNER_ID:
-            logger.log(logging.INFO, "Unauthorized access to /{} denied for {}.".format(func.__name__, user_id))
-            return
+            # see if the user is a chat admin
+            if user_id not in get_admin_ids(context.bot, chat_id):
+                logger.log(logging.INFO, "Unauthorized access to /{} denied for {}.".format(func.__name__, user_id))
+                return
         return func(update, context, *args, **kwargs)
     return wrapped
 
