@@ -6,7 +6,7 @@ import logging
 import time
 from functools import wraps
 from telegram import Update, Message, Bot, ChatPermissions, ChatMember
-from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters, CallbackContext)
+from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters, CallbackContext, DispatcherHandlerStop)
 
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -61,6 +61,25 @@ def reply(message: Message, bot: Bot, text):
     bot.send_message(message.chat_id, text, reply_to_message_id=message.message_id, parse_mode="html")
 
 
+def on_member_join(update: Update, context: CallbackContext):
+    print('call')
+    if update.message.new_chat_members is not None:
+        chat = update.effective_chat
+        chat_id = chat.id
+        db_cursor.execute("SELECT welcome FROM group_settings where gid=%s", [chat_id])
+        result = db_cursor.fetchall()
+        if len(result) > 0:
+            welcome = result[0][0]
+            for user in update.message.new_chat_members:
+                msg = welcome\
+                    .replace('{{lastName}}', user.last_name or "")\
+                    .replace('{{firstName}}', user.first_name or "")\
+                    .replace('{{groupName}}', chat.title or "")\
+                    .replace('{{uid}}', str(user.id or 0))
+                reply(update.message, context.bot, msg)
+        raise DispatcherHandlerStop
+
+
 def cmd_id(update: Update, context: CallbackContext):
     # if not a reply, display both group and user id
     message: Message = update.message
@@ -97,7 +116,7 @@ def cmd_bulletin(update: Update, context: CallbackContext):
             return
     db_cursor.execute("SELECT content from bulletin where gid=%s and expires>unix_timestamp()", [chat_id])
     result = db_cursor.fetchall()
-    bulletin = '布告板：\n'
+    bulletin = '佈告版：\n'
     i = 1
     for x in result:
         bulletin += f'{i}. '
@@ -116,6 +135,7 @@ def cmd_ban(update: Update, context: CallbackContext):
         context.bot.kick_chat_member(replied.chat_id, replied.from_user.id)
         reply(update.message, context.bot, 'User banned!')
         logger.log(logging.INFO, f'{update.effective_user.id} has used /ban against {replied.from_user.id}')
+
 
 @restricted
 def cmd_unban(update: Update, context: CallbackContext):
@@ -153,6 +173,15 @@ def cmd_unmute(update: Update, context: CallbackContext):
         logger.log(logging.INFO, f'{update.effective_user.id} has used /unmute against {replied.from_user.id}')
 
 
+@restricted
+def cmd_welcome(update: Update, context: CallbackContext):
+    chat_id = update.effective_chat.id
+    msg = update.message.text.split(" ")
+    db_cursor.execute("REPLACE INTO group_settings (gid, welcome) VALUES (%s, %s)", [chat_id, " ".join(msg[1::])])
+    db_conn.commit()
+    reply(update.message, context.bot, "Welcome message set")
+
+
 def main():
     updater = Updater(config.BOT_TOKEN, use_context=True)
     updater.dispatcher.add_handler(CommandHandler('start', cmd_start))
@@ -163,7 +192,8 @@ def main():
     updater.dispatcher.add_handler(CommandHandler('mute', cmd_mute))
     updater.dispatcher.add_handler(CommandHandler('unmute', cmd_unmute))
     updater.dispatcher.add_handler(CommandHandler('bulletin', cmd_bulletin))
-    # updater.dispatcher.add_handler(MessageHandler)
+    updater.dispatcher.add_handler(CommandHandler('welcome', cmd_welcome))
+    updater.dispatcher.add_handler(MessageHandler(Filters.status_update.new_chat_members, on_member_join))
 
     updater.start_polling()
     updater.idle()
