@@ -109,8 +109,9 @@ def cmd_bulletin(update: Update, context: CallbackContext):
                 except ValueError:
                     reply(update.message, context.bot, f'{text[1]} is not a valid number')
                     return
-            db_cursor.execute("INSERT INTO bulletin (gid, content, expires) values (%s, %s, %s + unix_timestamp())",
-                              [chat_id, update.message.reply_to_message.text, time_limit])
+            db_cursor.execute("INSERT INTO bulletin (gid, content, expires, msg_id) values (%s, %s, "
+                              "%s + unix_timestamp(), %s)",
+                              [chat_id, update.message.reply_to_message.text + ' ~' + update.message.reply_to_message.from_user.first_name, time_limit, update.effective_message.message_id])
             db_conn.commit()
             reply(update.message, context.bot, "Added to bulletin")
             return
@@ -120,7 +121,7 @@ def cmd_bulletin(update: Update, context: CallbackContext):
     i = 1
     for x in result:
         bulletin += f'{i}. '
-        bulletin += x[0]
+        bulletin += str(x[0], encoding="utf8")
         bulletin += '\n\n'
         i += 1
     if len(result) > 0:
