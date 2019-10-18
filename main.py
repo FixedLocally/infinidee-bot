@@ -89,11 +89,9 @@ def cmd_bulletin(update: Update, context: CallbackContext):
                 except ValueError:
                     reply(update.message, context.bot, f'{text[1]} is not a valid number')
                     return
-            print(len([chat_id, update.message.reply_to_message.text, time_limit + time.time()]))
             db_cursor.execute("INSERT INTO bulletin (gid, content, expires) values (%s, %s, %s + unix_timestamp())",
                               [chat_id, update.message.reply_to_message.text, time_limit])
             db_conn.commit()
-            print(db_cursor.fetchwarnings())
             reply(update.message, context.bot, "Added to bulletin")
             return
     db_cursor.execute("SELECT content from bulletin where gid=%s and expires>unix_timestamp()", [chat_id])
@@ -116,13 +114,14 @@ def cmd_ban(update: Update, context: CallbackContext):
         replied = update.message.reply_to_message
         context.bot.kick_chat_member(replied.chat_id, replied.from_user.id)
         reply(update.message, context.bot, 'User banned!')
-
+        logger.log(logging.INFO, f'{update.effective_user.id} has used /ban against {replied.from_user.id}')
 
 @restricted
 def cmd_unban(update: Update, context: CallbackContext):
     if update.message.reply_to_message:
         replied = update.message.reply_to_message
         context.bot.unban_chat_member(replied.chat_id, replied.from_user.id)
+        logger.log(logging.INFO, f'{update.effective_user.id} has used /unban against {replied.from_user.id}')
 
 
 @restricted
@@ -132,6 +131,7 @@ def cmd_kick(update: Update, context: CallbackContext):
         context.bot.kick_chat_member(replied.chat_id, replied.from_user.id)
         context.bot.unban_chat_member(replied.chat_id, replied.from_user.id)
         reply(update.message, context.bot, 'User kicked!')
+        logger.log(logging.INFO, f'{update.effective_user.id} has used /kick against {replied.from_user.id}')
 
 
 @restricted
@@ -140,6 +140,7 @@ def cmd_mute(update: Update, context: CallbackContext):
         replied = update.message.reply_to_message
         context.bot.restrict_chat_member(replied.chat_id, replied.from_user.id, ChatPermissions())
         reply(update.message, context.bot, 'User muted!')
+        logger.log(logging.INFO, f'{update.effective_user.id} has used /mute against {replied.from_user.id}')
 
 
 @restricted
@@ -148,6 +149,7 @@ def cmd_unmute(update: Update, context: CallbackContext):
         replied = update.message.reply_to_message
         context.bot.restrict_chat_member(replied.chat_id, replied.from_user.id,
                                          ChatPermissions(True, True, True, True, True, True, True, True))
+        logger.log(logging.INFO, f'{update.effective_user.id} has used /unmute against {replied.from_user.id}')
 
 
 def main():
@@ -160,7 +162,7 @@ def main():
     updater.dispatcher.add_handler(CommandHandler('mute', cmd_mute))
     updater.dispatcher.add_handler(CommandHandler('unmute', cmd_unmute))
     updater.dispatcher.add_handler(CommandHandler('bulletin', cmd_bulletin))
-    # updater.dispatcher.add_handler()
+    # updater.dispatcher.add_handler(MessageHandler)
 
     updater.start_polling()
     updater.idle()
