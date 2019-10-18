@@ -57,12 +57,11 @@ def restricted(func):
     return wrapped
 
 
-def reply(message: Message, bot: Bot, text):
-    bot.send_message(message.chat_id, text, reply_to_message_id=message.message_id, parse_mode="html")
+def reply(message: Message, bot: Bot, text, parse_mode="html", **kwargs):
+    bot.send_message(message.chat_id, text, reply_to_message_id=message.message_id, parse_mode=parse_mode, **kwargs)
 
 
 def on_member_join(update: Update, context: CallbackContext):
-    print('call')
     if update.message.new_chat_members is not None:
         chat = update.effective_chat
         chat_id = chat.id
@@ -122,17 +121,26 @@ def cmd_bulletin(update: Update, context: CallbackContext):
                 db_conn.commit()
                 reply(update.message, context.bot, "Added to bulletin")
             return
-    db_cursor.execute("SELECT content from bulletin where gid=%s and expires>unix_timestamp()", [chat_id])
+    db_cursor.execute("SELECT content, msg_id from bulletin where gid=%s and expires>unix_timestamp() ORDER BY id", [chat_id])
     result = db_cursor.fetchall()
     bulletin = '佈告版：\n'
     i = 1
     for x in result:
-        bulletin += f'{i}. '
-        bulletin += str(x[0], encoding="utf8")
-        bulletin += '\n\n'
+        bulletin += f'{i}. ['
+        bulletin += str(x[0], encoding="utf8")\
+            .replace('`', '\\`')\
+            .replace('[', '\\[')\
+            .replace(']', '\\]')\
+            .replace('(', '\\(')\
+            .replace(')', '\\)')\
+            .replace('*', '\\*')\
+            .replace('_', '\\_')
+        # -1001352189020 -> 1352189020
+        cid = -chat_id - 1000000000000
+        bulletin += f'](https://t.me/c/{cid}/{x[1]})\n\n'
         i += 1
     if len(result) > 0:
-        reply(update.message, context.bot, bulletin)
+        reply(update.message, context.bot, bulletin, parse_mode="markdown")
 
 
 # mod commands
