@@ -109,11 +109,18 @@ def cmd_bulletin(update: Update, context: CallbackContext):
                 except ValueError:
                     reply(update.message, context.bot, f'{text[1]} is not a valid number')
                     return
-            db_cursor.execute("INSERT INTO bulletin (gid, content, expires, msg_id) values (%s, %s, "
-                              "%s + unix_timestamp(), %s)",
-                              [chat_id, update.message.reply_to_message.text + ' ~' + update.message.reply_to_message.from_user.first_name, time_limit, update.effective_message.message_id])
-            db_conn.commit()
-            reply(update.message, context.bot, "Added to bulletin")
+            db_cursor.execute("SELECT 1 from bulletin WHERE gid=%s and msg_id=%s", [chat_id, update.message.reply_to_message.message_id])
+            result = db_cursor.fetchall()
+            if len(result) > 0:
+                db_cursor.execute("DELETE FROM bulletin WHERE gid=%s and msg_id=%s", [chat_id, update.message.reply_to_message.message_id])
+                db_conn.commit()
+                reply(update.message, context.bot, "Removed from bulletin")
+            else:
+                db_cursor.execute("INSERT INTO bulletin (gid, content, expires, msg_id) values (%s, %s, "
+                                  "%s + unix_timestamp(), %s)",
+                                  [chat_id, update.message.reply_to_message.text + ' ~' + update.message.reply_to_message.from_user.first_name, time_limit, update.message.reply_to_message.message_id])
+                db_conn.commit()
+                reply(update.message, context.bot, "Added to bulletin")
             return
     db_cursor.execute("SELECT content from bulletin where gid=%s and expires>unix_timestamp()", [chat_id])
     result = db_cursor.fetchall()
