@@ -21,6 +21,7 @@ db_conn = mysql.connector.connect(
     pool_size=4,
     pool_name="infinidee",
     auth_plugin='mysql_native_password',
+    charset='utf8mb4'
 )
 db_cursor = db_conn.cursor()
 

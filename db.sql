@@ -1,7 +1,7 @@
 CREATE TABLE `bulletin` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `gid` bigint(20) NOT NULL,
-  `content` text NOT NULL,
+  `content` text NOT NULL COLLATE utf8mb4_bin,
   `expires` int(11) NOT NULL,
   PRIMARY KEY (`id`),
   KEY `bulletin_gid_index` (`gid`)
