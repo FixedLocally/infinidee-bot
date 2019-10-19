@@ -83,6 +83,7 @@ def on_member_join(update: Update, context: CallbackContext):
 def on_message(update: Update, context: CallbackContext):
     chat_id = update.effective_chat.id
     message = update.effective_message
+    reply_message = update.message.reply_to_message or update.message
     msg = message.text
     if msg is None or len(msg) == 0:
         return
@@ -98,15 +99,15 @@ def on_message(update: Update, context: CallbackContext):
         if msg_type == 'text':
             reply(update.message, context.bot, msg_text)
         elif msg_type == 'sticker':
-            context.bot.send_sticker(chat_id, msg_text, reply_to_message_id=message.message_id)
+            context.bot.send_sticker(chat_id, msg_text, reply_to_message_id=reply_message.message_id)
         elif msg_type == 'photo':
-            context.bot.send_photo(chat_id, msg_text, reply_to_message_id=message.message_id)
+            context.bot.send_photo(chat_id, msg_text, reply_to_message_id=reply_message.message_id)
         elif msg_type == 'gif':
-            context.bot.send_animation(chat_id, msg_text, reply_to_message_id=message.message_id)
+            context.bot.send_animation(chat_id, msg_text, reply_to_message_id=reply_message.message_id)
         elif msg_type == 'voice':
-            context.bot.send_voice(chat_id, msg_text, reply_to_message_id=message.message_id)
+            context.bot.send_voice(chat_id, msg_text, reply_to_message_id=reply_message.message_id)
         elif msg_type == 'audio':
-            context.bot.send_audio(chat_id, msg_text, reply_to_message_id=message.message_id)
+            context.bot.send_audio(chat_id, msg_text, reply_to_message_id=reply_message.message_id)
 
         raise DispatcherHandlerStop
 
@@ -176,7 +177,15 @@ def cmd_bulletin(update: Update, context: CallbackContext):
 
 
 def cmd_log(update: Update, context: CallbackContext):
-    print(update.message.reply_to_message)
+    if update.message.reply_to_message:
+        print(update.message.reply_to_message)
+        entities = update.message.reply_to_message.parse_entities()
+        for i in entities:
+            entity: MessageEntity = i
+            print(entity.type)
+            print(entity.to_json())
+            Message.de_json()
+            print(entities[i])
 
 
 # mod commands
