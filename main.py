@@ -5,7 +5,7 @@ import mysql.connector
 import logging
 import time
 from functools import wraps
-from telegram import Update, Message, Bot, ChatPermissions, ChatMember
+from telegram import Update, Message, Bot, ChatPermissions, ChatMember, MessageEntity
 from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters, CallbackContext, DispatcherHandlerStop)
 
 logging.basicConfig(level=logging.INFO,
@@ -97,12 +97,16 @@ def on_message(update: Update, context: CallbackContext):
         msg_text = response['msg_text']
         if msg_type == 'text':
             reply(update.message, context.bot, msg_text)
+        elif msg_type == 'sticker':
+            context.bot.send_sticker(chat_id, msg_text, reply_to_message_id=message.message_id)
         elif msg_type == 'photo':
             context.bot.send_photo(chat_id, msg_text, reply_to_message_id=message.message_id)
         elif msg_type == 'gif':
             context.bot.send_animation(chat_id, msg_text, reply_to_message_id=message.message_id)
         elif msg_type == 'voice':
             context.bot.send_voice(chat_id, msg_text, reply_to_message_id=message.message_id)
+        elif msg_type == 'audio':
+            context.bot.send_audio(chat_id, msg_text, reply_to_message_id=message.message_id)
 
         raise DispatcherHandlerStop
 
@@ -238,11 +242,19 @@ def cmd_respond(update: Update, context: CallbackContext):
         response = update.message.reply_to_message
         msg_type = 'text'
         msg_text = response.text
-        # see if its an image/gif/voice note
+        # see if its an image/gif/voice note/sticker
+        if response.sticker:
+            # is voice note
+            msg_type = 'sticker'
+            msg_text = response.sticker.file_id
         if response.voice:
             # is voice note
             msg_type = 'voice'
             msg_text = response.voice.file_id
+        if response.audio:
+            # is voice note
+            msg_type = 'audio'
+            msg_text = response.audio.file_id
         if response.photo:
             # is voice note
             msg_type = 'photo'
