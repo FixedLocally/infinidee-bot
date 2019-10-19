@@ -98,7 +98,7 @@ def on_message(update: Update, context: CallbackContext):
         msg_type = response['msg_type']
         msg_text = response['msg_text']
         if msg_type == 'text':
-            reply(update.message, context.bot, msg_text)
+            reply(reply_message, context.bot, msg_text)
         elif msg_type == 'sticker':
             context.bot.send_sticker(chat_id, msg_text, reply_to_message_id=reply_message.message_id)
         elif msg_type == 'photo':
