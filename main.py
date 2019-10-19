@@ -1,11 +1,13 @@
 # Intended to be used in @InfiniDee only
+import json
 
 import config
 import mysql.connector
 import logging
+import re
 import time
 from functools import wraps
-from telegram import Update, Message, Bot, ChatPermissions, ChatMember, MessageEntity
+from telegram import Update, Message, Bot, ChatPermissions, MessageEntity
 from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters, CallbackContext, DispatcherHandlerStop)
 
 logging.basicConfig(level=logging.INFO,
@@ -98,7 +100,30 @@ def on_message(update: Update, context: CallbackContext):
         msg_type = response['msg_type']
         msg_text = response['msg_text']
         if msg_type == 'text':
-            reply(reply_message, context.bot, msg_text)
+            if response['entities'] is not None:
+                msg_text_backup = msg_text
+                for i in reversed(response['entities']):
+                    segment = msg_text_backup[i[1]:i[1]+i[2]]
+                    print('from: ', msg_text)
+                    print('entity: ', i)
+                    if i[0] == 'text_mention':
+                        msg_text = msg_text_backup[:i[1]] + f'[{segment}](tg://user?id={i[3]})' + msg_text[i[1]+i[2]:]
+                    elif i[0] == 'text_link':
+                        msg_text = msg_text_backup[:i[1]] + f'[{segment}]({i[3]})' + msg_text[i[1]+i[2]:]
+                    elif i[0] == 'italic':
+                        msg_text = msg_text_backup[:i[1]] + f'_{segment}_' + msg_text[i[1]+i[2]:]
+                    elif i[0] == 'bold':
+                        msg_text = msg_text_backup[:i[1]] + f'*{segment}*' + msg_text[i[1]+i[2]:]
+                    elif i[0] == 'code' or i[0] == 'pre':
+                        if segment.find('\n') >= 0:
+                            msg_text = msg_text_backup[:i[1]] + f'```{segment}```' + msg_text[i[1]+i[2]:]
+                        else:
+                            msg_text = msg_text_backup[:i[1]] + f'`{segment}`' + msg_text[i[1]+i[2]:]
+
+                    print('to: ', msg_text)
+
+            reply(reply_message, context.bot, msg_text, parse_mode="markdown")
+            print(msg_text)
         elif msg_type == 'sticker':
             context.bot.send_sticker(chat_id, msg_text, reply_to_message_id=reply_message.message_id)
         elif msg_type == 'photo':
@@ -155,7 +180,8 @@ def cmd_bulletin(update: Update, context: CallbackContext):
                 db_conn.commit()
                 reply(update.message, context.bot, "Added to bulletin")
             return
-    db_cursor.execute("SELECT content, msg_id from bulletin where gid=%s and expires>unix_timestamp() ORDER BY id", [chat_id])
+    db_cursor.execute("SELECT content, msg_id from bulletin where gid=%s and expires>unix_timestamp() ORDER BY id",
+                      [chat_id])
     result = db_cursor.fetchall()
     bulletin = '佈告版：\n'
     i = 1
@@ -185,6 +211,7 @@ def cmd_log(update: Update, context: CallbackContext):
             print("=== start entity ===")
             entity: MessageEntity = i
             print(entity.type)
+            print(entity.length)
             print(entity.to_json())
             # Message.de_json()
             print(entities[i])
@@ -275,14 +302,34 @@ def cmd_respond(update: Update, context: CallbackContext):
             # gif
             msg_type = 'gif'
             msg_text = response.document.file_id
-        add_response_trigger(chat_id, msg_type, msg_text, trigger)
-        db_cursor.execute("INSERT INTO auto_response (gid, msg_type, msg_text, `trigger`) VALUES (%s, %s, %s, %s)",
-                          [chat_id, msg_type, msg_text, trigger])
+        # entities
+        entities = update.message.reply_to_message.parse_entities()
+        stored_entities_list = []  # [[type, start, offset, target]]
+        offset_adjustment = 0
+        emoji_positions = list(map(is_emoji, msg_text))
+        offsets = [0]
+        for i in emoji_positions:
+            offsets.append(1 + i + offsets[len(offsets) - 1])
+        print(offsets)
+        for i in entities:
+            entity: MessageEntity = i
+            e_type = entity.type
+            offset_adjustment = entity.offset - offsets.index(entity.offset)
+            if e_type == 'text_link':
+                stored_entities_list.append([e_type, entity.offset - offset_adjustment, len(entities[i].rstrip()), entity.url])
+            elif e_type == 'text_mention':
+                stored_entities_list.append([e_type, entity.offset - offset_adjustment, len(entities[i].rstrip()), entity.user.id])
+            else:
+                stored_entities_list.append([e_type, entity.offset - offset_adjustment, len(entities[i].rstrip()), ""])
+        stored_entities = json.dumps(stored_entities_list)
+        add_response_trigger(chat_id, msg_type, msg_text, trigger, stored_entities)
+        db_cursor.execute("INSERT INTO auto_response (gid, msg_type, msg_text, `trigger`, entities) VALUES (%s, %s, %s, %s, %s)",
+                          [chat_id, msg_type, msg_text, trigger, stored_entities])
         db_conn.commit()
         reply(update.message, context.bot, "Auto responder set")
 
 
-def add_response_trigger(chat_id, msg_type, msg_text, trigger):
+def add_response_trigger(chat_id, msg_type, msg_text, trigger, stored_entities):
     responders = {}
     try:
         responders = auto_responders[chat_id]
@@ -291,12 +338,19 @@ def add_response_trigger(chat_id, msg_type, msg_text, trigger):
     responders[trigger] = {}
     responders[trigger]['msg_type'] = msg_type
     responders[trigger]['msg_text'] = msg_text
+    responders[trigger]['entities'] = None
+    if stored_entities is not None:
+        responders[trigger]['entities'] = json.loads(stored_entities)
     auto_responders[chat_id] = responders
+
+
+def is_emoji(c):
+    return len(re.findall(u'[\U0001f300-\U0001fa95]', c[0]))
 
 
 def main():
     # auto responders
-    db_cursor.execute("SELECT gid, msg_type, msg_text, `trigger` FROM auto_response")
+    db_cursor.execute("SELECT gid, msg_type, msg_text, `trigger`, entities FROM auto_response")
     while True:
         row = db_cursor.fetchone()
         if row is None:
