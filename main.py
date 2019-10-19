@@ -83,12 +83,13 @@ def on_member_join(update: Update, context: CallbackContext):
 def on_message(update: Update, context: CallbackContext):
     chat_id = update.effective_chat.id
     message = update.effective_message
-    reply_message = update.message.reply_to_message or update.message
+    if message is None:
+        return
+    reply_message = update.effective_message.reply_to_message or message
     msg = message.text
     if msg is None or len(msg) == 0:
         return
     msg = msg.lower()
-    response = None
     try:
         response = auto_responders[chat_id][msg]
     except KeyError:
@@ -181,11 +182,13 @@ def cmd_log(update: Update, context: CallbackContext):
         print(update.message.reply_to_message)
         entities = update.message.reply_to_message.parse_entities()
         for i in entities:
+            print("=== start entity ===")
             entity: MessageEntity = i
             print(entity.type)
             print(entity.to_json())
-            Message.de_json()
+            # Message.de_json()
             print(entities[i])
+            print(len(entities[i]))
 
 
 # mod commands
