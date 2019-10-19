@@ -104,8 +104,6 @@ def on_message(update: Update, context: CallbackContext):
                 msg_text_backup = msg_text
                 for i in reversed(response['entities']):
                     segment = msg_text_backup[i[1]:i[1]+i[2]]
-                    print('from: ', msg_text)
-                    print('entity: ', i)
                     if i[0] == 'text_mention':
                         msg_text = msg_text_backup[:i[1]] + f'[{segment}](tg://user?id={i[3]})' + msg_text[i[1]+i[2]:]
                     elif i[0] == 'text_link':
@@ -120,10 +118,8 @@ def on_message(update: Update, context: CallbackContext):
                         else:
                             msg_text = msg_text_backup[:i[1]] + f'`{segment}`' + msg_text[i[1]+i[2]:]
 
-                    print('to: ', msg_text)
 
             reply(reply_message, context.bot, msg_text, parse_mode="markdown")
-            print(msg_text)
         elif msg_type == 'sticker':
             context.bot.send_sticker(chat_id, msg_text, reply_to_message_id=reply_message.message_id)
         elif msg_type == 'photo':
