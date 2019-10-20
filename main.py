@@ -127,7 +127,7 @@ def on_message(update: Update, context: CallbackContext):
                 context.bot.kick_chat_member(chat_id, sender)
                 reply(update.message, context.bot, f'[{message.from_user.first_name}](tg://user?id={sender}) () is flooding, banning!', parse_mode="markdown")
                 logger.log(logging.INFO, f'{sender} sent {threshold} messages in {dur} secs, banning!')
-            items = list(user_deque)[:-6:-1]
+            items = list(user_deque)[:-1 - threshold:-1]
             for item in items:
                 context.bot.delete_message(chat_id, item[1])
     # auto responder
