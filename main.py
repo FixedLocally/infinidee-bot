@@ -325,6 +325,43 @@ def cmd_respond(update: Update, context: CallbackContext):
         reply(update.message, context.bot, "Auto responder set")
 
 
+def cmd_schedule(update: Update, context: CallbackContext):
+    user_id = update.effective_user.id
+    if user_id in config.SCHEDULE_ADMIN:
+        if len(context.args) > 2:
+            # add to schedule
+            args = update.message.text.split(" ", 3)
+            start_date = parse_date(args[1])
+            end_date = parse_date(args[2])
+            event = args[3]
+            if start_date > end_date:
+                reply(update.message, context.bot, 'Error: event ends before starting')
+                return
+            db_cursor.execute("INSERT INTO schedule (start_time, end_time, event) VALUES (%s, %s, %s)",
+                              [start_date, end_date, event])
+            db_conn.commit()
+            insert_id = db_cursor.lastrowid
+            reply(update.message, context.bot, f'Inserted as record {insert_id}')
+            # not ended and will start within a week
+    db_cursor.execute("SELECT id, start_time, end_time, event FROM schedule WHERE "
+                      "end_time>unix_timestamp() and start_time<unix_timestamp()+604800 "
+                      "ORDER BY start_time")
+    msg = '香港人日程：\n'
+    while True:
+        row = db_cursor.fetchone()
+        if row is None:
+            break
+        msg += f'{row[0]}. {long_date(row[1])} - '
+        if same_day(row[1], row[2]):
+            msg += short_date(row[2])
+        else:
+            msg += long_date(row[2])
+        msg += '\n'
+        msg += row[3]
+        msg += '\n\n'
+    reply(update.message, context.bot, msg)
+
+
 def add_response_trigger(chat_id, msg_type, msg_text, trigger, stored_entities):
     responders = {}
     try:
@@ -342,6 +379,36 @@ def add_response_trigger(chat_id, msg_type, msg_text, trigger, stored_entities):
 
 def is_emoji(c):
     return len(re.findall(u'[\U0001f300-\U0001fa95]', c[0]))
+
+
+def parse_date(s):  # yyyymmddhhmm[ss]
+    try:
+        year = int(s[0:4])
+        month = int(s[4:6])
+        day = int(s[6:8])
+        hour = int(s[8:10])
+        minute = int(s[10:12])
+        second = int(s[12:14] or '0')
+        return time.mktime((year, month, day, hour, minute, second, 1, 48, 0))
+    except ValueError:
+        return -1
+
+
+def long_date(t):
+    tm = time.localtime(t)
+    return f'{tm.tm_year}-{tm.tm_mon}-{tm.tm_mday} {tm.tm_hour}:{tm.tm_min}'
+
+
+def short_date(t):
+    tm = time.localtime(t)
+    return f'{tm.tm_hour}:{tm.tm_min}'
+
+
+def same_day(t1, t2):
+    tm1 = time.localtime(t1)
+    tm2 = time.localtime(t2)
+    return tm1.tm_year == tm2.tm_year and tm1.tm_mon == tm2.tm_mon and tm1.tm_mday == tm2.tm_mday
+
 
 
 def main():
@@ -366,6 +433,7 @@ def main():
     updater.dispatcher.add_handler(CommandHandler('welcome', cmd_welcome))
     updater.dispatcher.add_handler(CommandHandler('log', cmd_log))
     updater.dispatcher.add_handler(CommandHandler('respond', cmd_respond))
+    updater.dispatcher.add_handler(CommandHandler('schedule', cmd_schedule))
     updater.dispatcher.add_handler(MessageHandler(Filters.status_update.new_chat_members, on_member_join))
     updater.dispatcher.add_handler(MessageHandler(None, on_message))
 
