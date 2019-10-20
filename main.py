@@ -407,7 +407,8 @@ def cmd_schedule(update: Update, context: CallbackContext):
 
 def add_response_trigger(chat_id, msg_type, msg_text, trigger, stored_entities):
     responders = {}
-    trigger = str(trigger)
+    if not isinstance(trigger, str):
+        trigger = str(trigger, encoding="utf8")
     try:
         responders = auto_responders[chat_id]
     except KeyError:
