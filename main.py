@@ -407,17 +407,17 @@ def cmd_schedule(update: Update, context: CallbackContext):
 
 def add_response_trigger(chat_id, msg_type, msg_text, trigger, stored_entities):
     responders = {}
+    trigger = str(trigger)
     try:
         responders = auto_responders[chat_id]
     except KeyError:
-        pass
+        auto_responders[chat_id] = responders
     responders[trigger] = {}
     responders[trigger]['msg_type'] = msg_type
     responders[trigger]['msg_text'] = msg_text
     responders[trigger]['entities'] = None
     if stored_entities is not None:
         responders[trigger]['entities'] = json.loads(stored_entities)
-    auto_responders[chat_id] = responders
 
 
 def is_emoji(c):
