@@ -6,7 +6,7 @@ CREATE TABLE `auto_response` (
   `trigger` varchar(64) NOT NULL,
   `entities` text,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `bulletin` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -17,7 +17,7 @@ CREATE TABLE `bulletin` (
   PRIMARY KEY (`msg_id`,`id`),
   UNIQUE KEY `BULLETIN_id_uindex` (`id`),
   KEY `bulletin_gid_index` (`gid`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `group_settings` (
   `gid` bigint(20) NOT NULL,
@@ -25,7 +25,7 @@ CREATE TABLE `group_settings` (
   `flood_threshold` int(11) DEFAULT NULL,
   `flood_action` varchar(5) DEFAULT 'mute',
   PRIMARY KEY (`gid`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `schedule` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -33,4 +33,4 @@ CREATE TABLE `schedule` (
   `end_time` int(11) NOT NULL,
   `event` text NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin
