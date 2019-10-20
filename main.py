@@ -306,7 +306,6 @@ def cmd_respond(update: Update, context: CallbackContext):
         offsets = [0]
         for i in emoji_positions:
             offsets.append(1 + i + offsets[len(offsets) - 1])
-        print(offsets)
         for i in entities:
             entity: MessageEntity = i
             e_type = entity.type
