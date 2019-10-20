@@ -1,14 +1,16 @@
 # Intended to be used in @InfiniDee only
+import collections
 import json
-
-import config
-import mysql.connector
 import logging
 import re
 import time
 from functools import wraps
+
+import mysql.connector
 from telegram import Update, Message, Bot, ChatPermissions, MessageEntity
 from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters, CallbackContext, DispatcherHandlerStop)
+
+import config
 
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -26,7 +28,9 @@ db_conn = mysql.connector.connect(
     charset='utf8mb4'
 )
 db_cursor = db_conn.cursor()
-auto_responders = {}  # dict of dict {gid: {trigger1: response1, ...}, ...}
+auto_responders = {}  # {gid: {trigger1: response1, ...}, ...}
+group_settings = {}  # {gid: row}
+message_time_log = {}  # {gid: {uid: deque}}
 
 
 def get_admin_ids(bot, chat_id):
@@ -68,10 +72,13 @@ def on_member_join(update: Update, context: CallbackContext):
     if update.message.new_chat_members is not None:
         chat = update.effective_chat
         chat_id = chat.id
-        db_cursor.execute("SELECT welcome FROM group_settings where gid=%s", [chat_id])
-        result = db_cursor.fetchall()
-        if len(result) > 0:
-            welcome = result[0][0]
+        result = None
+        try:
+            result = group_settings[chat_id]
+        except KeyError:
+            pass
+        if result is not None:
+            welcome = result[0]
             for user in update.message.new_chat_members:
                 msg = welcome\
                     .replace('{{lastName}}', user.last_name or "")\
@@ -87,6 +94,43 @@ def on_message(update: Update, context: CallbackContext):
     message = update.effective_message
     if message is None:
         return
+    # anti-spam
+    threshold = group_settings[chat_id][1]
+    action = group_settings[chat_id][2]
+    sender = message.from_user.id
+    group_msg_log = {}
+    try:
+        group_msg_log = message_time_log[chat_id]
+    except KeyError:
+        message_time_log[chat_id] = group_msg_log
+    user_deque = collections.deque(maxlen=11)
+    try:
+        user_deque = group_msg_log[sender]
+    except KeyError:
+        group_msg_log[sender] = user_deque
+    now = time.time()
+    user_deque.append((now, message.message_id))
+    if len(user_deque) > threshold:
+        dur = now - user_deque[len(user_deque) - 1 - threshold][0]
+        if dur < 5:
+            # threshold messages in 5 secs, action
+            if action == 'mute':
+                context.bot.restrict_chat_member(chat_id, sender, ChatPermissions())
+                reply(update.message, context.bot, f'[{message.from_user.first_name}](tg://user?id={sender}) () is flooding, muting!', parse_mode="markdown")
+                logger.log(logging.INFO, f'{sender} sent {threshold} messages in {dur} secs, muting!')
+            elif action == 'kick':
+                context.bot.kick_chat_member(chat_id, sender)
+                context.bot.unban_chat_member(chat_id, sender)
+                reply(update.message, context.bot, f'[{message.from_user.first_name}](tg://user?id={sender}) () is flooding, kicking!', parse_mode="markdown")
+                logger.log(logging.INFO, f'{sender} sent {threshold} messages in {dur} secs, kicking!')
+            elif action == 'ban':
+                context.bot.kick_chat_member(chat_id, sender)
+                reply(update.message, context.bot, f'[{message.from_user.first_name}](tg://user?id={sender}) () is flooding, banning!', parse_mode="markdown")
+                logger.log(logging.INFO, f'{sender} sent {threshold} messages in {dur} secs, banning!')
+            items = list(user_deque)[:-6:-1]
+            for item in items:
+                context.bot.delete_message(chat_id, item[1])
+    # auto responder
     reply_message = update.effective_message.reply_to_message or message
     msg = message.text
     if msg is None or len(msg) == 0:
@@ -409,7 +453,6 @@ def same_day(t1, t2):
     return tm1.tm_year == tm2.tm_year and tm1.tm_mon == tm2.tm_mon and tm1.tm_mday == tm2.tm_mday
 
 
-
 def main():
     # auto responders
     db_cursor.execute("SELECT gid, msg_type, msg_text, `trigger`, entities FROM auto_response")
@@ -418,6 +461,14 @@ def main():
         if row is None:
             break
         add_response_trigger(*row)
+
+    # group settings
+    db_cursor.execute("SELECT gid, welcome, flood_threshold, flood_action FROM group_settings")
+    while True:
+        row = db_cursor.fetchone()
+        if row is None:
+            break
+        group_settings[row[0]] = row[1:]
 
     # handlers
     updater = Updater(config.BOT_TOKEN, use_context=True)
