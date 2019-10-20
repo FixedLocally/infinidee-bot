@@ -23,6 +23,7 @@ CREATE TABLE `group_settings` (
   `gid` bigint(20) NOT NULL,
   `welcome` text,
   `flood_threshold` int(11) DEFAULT NULL,
+  `flood_action` varchar(5) DEFAULT 'mute',
   PRIMARY KEY (`gid`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
