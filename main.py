@@ -25,7 +25,7 @@ db_conn = mysql.connector.connect(
     pool_size=4,
     pool_name="infinidee",
     auth_plugin='mysql_native_password',
-    charset='utf8mb4'
+    # charset='utf8mb4'
 )
 db_cursor = db_conn.cursor()
 auto_responders = {}  # {gid: {trigger1: response1, ...}, ...}
@@ -226,8 +226,10 @@ def cmd_bulletin(update: Update, context: CallbackContext):
     bulletin = '佈告版：\n'
     i = 1
     for x in result:
+        if not isinstance(x[0], str):
+            x[0] = str(x[0], encoding="utf8")
         bulletin += f'{i}. ['
-        bulletin += str(x[0], encoding="utf8")\
+        bulletin += x[0]\
             .replace('`', '\\`')\
             .replace('[', '\\[')\
             .replace(']', '\\]')\
