@@ -310,7 +310,11 @@ def cmd_unmute(update: Update, context: CallbackContext):
 def cmd_welcome(update: Update, context: CallbackContext):
     chat_id = update.effective_chat.id
     msg = update.message.text.split(" ")
-    db_cursor.execute("REPLACE INTO group_settings (gid, welcome) VALUES (%s, %s)", [chat_id, " ".join(msg[1::])])
+    group_settings[chat_id][1] = " ".join(msg[1::])
+    args = [chat_id]
+    args.extend(group_settings[chat_id][1:])
+    db_cursor.execute("REPLACE INTO group_settings (gid, welcome, flood_threshold, flood_action) VALUES (%s, %s, %s, %s)",
+                      args)
     db_conn.commit()
     reply(update.message, context.bot, "Welcome message set")
 
