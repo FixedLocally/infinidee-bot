@@ -266,7 +266,7 @@ def cmd_ban(update: Update, context: CallbackContext):
     if update.message.reply_to_message:
         replied = update.message.reply_to_message
         context.bot.kick_chat_member(replied.chat_id, replied.from_user.id)
-        reply(update.message, context.bot, 'User banned!')
+        reply(update.message, context.bot, '已封鎖用戶！谷務：https://t.me/joinchat/FzCcTBPjQs9uYJgYm3oeYQ', disable_link_preview=True)
         logger.log(logging.INFO, f'{update.effective_user.id} has used /ban against {replied.from_user.id}')
 
 
@@ -284,7 +284,7 @@ def cmd_kick(update: Update, context: CallbackContext):
         replied = update.message.reply_to_message
         context.bot.kick_chat_member(replied.chat_id, replied.from_user.id)
         context.bot.unban_chat_member(replied.chat_id, replied.from_user.id)
-        reply(update.message, context.bot, 'User kicked!')
+        reply(update.message, context.bot, '已移除用戶！谷務：https://t.me/joinchat/FzCcTBPjQs9uYJgYm3oeYQ', disable_link_preview=True)
         logger.log(logging.INFO, f'{update.effective_user.id} has used /kick against {replied.from_user.id}')
 
 
@@ -293,7 +293,7 @@ def cmd_mute(update: Update, context: CallbackContext):
     if update.message.reply_to_message:
         replied = update.message.reply_to_message
         context.bot.restrict_chat_member(replied.chat_id, replied.from_user.id, ChatPermissions())
-        reply(update.message, context.bot, 'User muted!')
+        reply(update.message, context.bot, '已將用戶禁言！谷務：https://t.me/joinchat/FzCcTBPjQs9uYJgYm3oeYQ', disable_link_preview=True)
         logger.log(logging.INFO, f'{update.effective_user.id} has used /mute against {replied.from_user.id}')
 
 
