@@ -27,7 +27,6 @@ db_conn = mysql.connector.connect(
     auth_plugin='mysql_native_password',
     # charset='utf8mb4'
 )
-db_cursor = db_conn.cursor()
 auto_responders = {}  # {gid: {trigger1: response1, ...}, ...}
 group_settings = {}  # {gid: row}
 message_time_log = {}  # {gid: {uid: deque}}
@@ -161,8 +160,6 @@ def on_message(update: Update, context: CallbackContext):
                             msg_text = msg_text_backup[:i[1]] + f'```{segment}```' + msg_text[i[1]+i[2]:]
                         else:
                             msg_text = msg_text_backup[:i[1]] + f'`{segment}`' + msg_text[i[1]+i[2]:]
-
-
             reply(reply_message, context.bot, msg_text, parse_mode="markdown")
         elif msg_type == 'sticker':
             context.bot.send_sticker(chat_id, msg_text, reply_to_message_id=reply_message.message_id)
@@ -196,6 +193,7 @@ def cmd_start(update: Update, context: CallbackContext):
 def cmd_bulletin(update: Update, context: CallbackContext):
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
+    db_cursor = db_conn.cursor()
     if update.message.reply_to_message:
         if user_id in get_admin_ids(context.bot, chat_id):
             # add message to bulletin
@@ -313,6 +311,7 @@ def cmd_welcome(update: Update, context: CallbackContext):
     group_settings[chat_id][1] = " ".join(msg[1::])
     args = [chat_id]
     args.extend(group_settings[chat_id][1:])
+    db_cursor = db_conn.cursor()
     db_cursor.execute("REPLACE INTO group_settings (gid, welcome, flood_threshold, flood_action) VALUES (%s, %s, %s, %s)",
                       args)
     db_conn.commit()
@@ -351,7 +350,6 @@ def cmd_respond(update: Update, context: CallbackContext):
         # entities
         entities = update.message.reply_to_message.parse_entities()
         stored_entities_list = []  # [[type, start, offset, target]]
-        offset_adjustment = 0
         emoji_positions = list(map(is_emoji, msg_text))
         offsets = [0]
         for i in emoji_positions:
@@ -368,6 +366,7 @@ def cmd_respond(update: Update, context: CallbackContext):
                 stored_entities_list.append([e_type, entity.offset - offset_adjustment, len(entities[i].rstrip()), ""])
         stored_entities = json.dumps(stored_entities_list)
         add_response_trigger(chat_id, msg_type, msg_text, trigger, stored_entities)
+        db_cursor = db_conn.cursor()
         db_cursor.execute("INSERT INTO auto_response (gid, msg_type, msg_text, `trigger`, entities) VALUES (%s, %s, %s, %s, %s)",
                           [chat_id, msg_type, msg_text, trigger, stored_entities])
         db_conn.commit()
@@ -376,6 +375,7 @@ def cmd_respond(update: Update, context: CallbackContext):
 
 def cmd_schedule(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
+    db_cursor = db_conn.cursor()
     if user_id in config.SCHEDULE_ADMIN:
         if len(context.args) > 2:
             # add to schedule
@@ -462,6 +462,7 @@ def same_day(t1, t2):
 
 def main():
     # auto responders
+    db_cursor = db_conn.cursor()
     db_cursor.execute("SELECT gid, msg_type, msg_text, `trigger`, entities FROM auto_response")
     while True:
         row = db_cursor.fetchone()
