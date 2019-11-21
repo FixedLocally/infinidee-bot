@@ -86,21 +86,18 @@ def on_member_join(update: Update, context: CallbackContext):
     if update.message.new_chat_members is not None:
         chat = update.effective_chat
         chat_id = chat.id
-        result = None
-        try:
+        if chat_id in group_settings_cache:
             result = group_settings_cache[chat_id]
-        except KeyError:
-            pass
-        if result is not None:
-            welcome = result[0]
-            for user in update.message.new_chat_members:
-                msg = welcome\
-                    .replace('{{lastName}}', user.last_name or "")\
-                    .replace('{{firstName}}', user.first_name or "")\
-                    .replace('{{groupName}}', chat.title or "")\
-                    .replace('{{uid}}', str(user.id or 0))
-                reply(update.message, context.bot, msg)
-        raise DispatcherHandlerStop
+            if result is not None:
+                welcome = result[0]
+                for user in update.message.new_chat_members:
+                    msg = welcome\
+                        .replace('{{lastName}}', user.last_name or "")\
+                        .replace('{{firstName}}', user.first_name or "")\
+                        .replace('{{groupName}}', chat.title or "")\
+                        .replace('{{uid}}', str(user.id or 0))
+                    reply(update.message, context.bot, msg)
+            raise DispatcherHandlerStop
 
 
 def on_message(update: Update, context: CallbackContext):
@@ -109,41 +106,42 @@ def on_message(update: Update, context: CallbackContext):
     if message is None:
         return
     # anti-spam
-    threshold = group_settings_cache[chat_id].flood_threshold
-    action = group_settings_cache[chat_id].flood_action
-    sender = message.from_user.id
-    group_msg_log = {}
-    try:
-        group_msg_log = message_time_log[chat_id]
-    except KeyError:
-        message_time_log[chat_id] = group_msg_log
-    user_deque = collections.deque(maxlen=11)
-    try:
-        user_deque = group_msg_log[sender]
-    except KeyError:
-        group_msg_log[sender] = user_deque
-    now = time.time()
-    user_deque.append((now, message.message_id))
-    if len(user_deque) > threshold:
-        dur = now - user_deque[len(user_deque) - 1 - threshold][0]
-        if dur < 5:
-            # threshold messages in 5 secs, action
-            if action == 'mute':
-                context.bot.restrict_chat_member(chat_id, sender, ChatPermissions())
-                reply(update.message, context.bot, f'[{message.from_user.first_name}](tg://user?id={sender}) () is flooding, muting!', parse_mode="markdown")
-                logger.log(logging.INFO, f'{sender} sent {threshold} messages in {dur} secs, muting!')
-            elif action == 'kick':
-                context.bot.kick_chat_member(chat_id, sender)
-                context.bot.unban_chat_member(chat_id, sender)
-                reply(update.message, context.bot, f'[{message.from_user.first_name}](tg://user?id={sender}) () is flooding, kicking!', parse_mode="markdown")
-                logger.log(logging.INFO, f'{sender} sent {threshold} messages in {dur} secs, kicking!')
-            elif action == 'ban':
-                context.bot.kick_chat_member(chat_id, sender)
-                reply(update.message, context.bot, f'[{message.from_user.first_name}](tg://user?id={sender}) () is flooding, banning!', parse_mode="markdown")
-                logger.log(logging.INFO, f'{sender} sent {threshold} messages in {dur} secs, banning!')
-            items = list(user_deque)[:-1 - threshold:-1]
-            for item in items:
-                context.bot.delete_message(chat_id, item[1])
+    if chat_id in group_settings_cache:
+        threshold = group_settings_cache[chat_id].flood_threshold
+        action = group_settings_cache[chat_id].flood_action
+        sender = message.from_user.id
+        group_msg_log = {}
+        try:
+            group_msg_log = message_time_log[chat_id]
+        except KeyError:
+            message_time_log[chat_id] = group_msg_log
+        user_deque = collections.deque(maxlen=11)
+        try:
+            user_deque = group_msg_log[sender]
+        except KeyError:
+            group_msg_log[sender] = user_deque
+        now = time.time()
+        user_deque.append((now, message.message_id))
+        if len(user_deque) > threshold:
+            dur = now - user_deque[len(user_deque) - 1 - threshold][0]
+            if dur < 5:
+                # threshold messages in 5 secs, action
+                if action == 'mute':
+                    context.bot.restrict_chat_member(chat_id, sender, ChatPermissions())
+                    reply(update.message, context.bot, f'[{message.from_user.first_name}](tg://user?id={sender}) () is flooding, muting!', parse_mode="markdown")
+                    logger.log(logging.INFO, f'{sender} sent {threshold} messages in {dur} secs, muting!')
+                elif action == 'kick':
+                    context.bot.kick_chat_member(chat_id, sender)
+                    context.bot.unban_chat_member(chat_id, sender)
+                    reply(update.message, context.bot, f'[{message.from_user.first_name}](tg://user?id={sender}) () is flooding, kicking!', parse_mode="markdown")
+                    logger.log(logging.INFO, f'{sender} sent {threshold} messages in {dur} secs, kicking!')
+                elif action == 'ban':
+                    context.bot.kick_chat_member(chat_id, sender)
+                    reply(update.message, context.bot, f'[{message.from_user.first_name}](tg://user?id={sender}) () is flooding, banning!', parse_mode="markdown")
+                    logger.log(logging.INFO, f'{sender} sent {threshold} messages in {dur} secs, banning!')
+                items = list(user_deque)[:-1 - threshold:-1]
+                for item in items:
+                    context.bot.delete_message(chat_id, item[1])
     # auto responder
     reply_message = update.effective_message.reply_to_message or message
     msg = message.text
