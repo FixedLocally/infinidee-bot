@@ -17,19 +17,33 @@ logging.basicConfig(level=logging.INFO,
 logger = logging.getLogger(__name__)
 admin_cache = {}
 cache_timeouts = {}
-db_conn = mysql.connector.connect(
-    host=config.DB_HOST,
-    user=config.DB_USER,
-    passwd=config.DB_PASS,
-    database=config.DB_NAME,
-    pool_size=4,
-    pool_name="infinidee",
-    auth_plugin='mysql_native_password',
-    # charset='utf8mb4'
-)
+db_conn = None
 auto_responders = {}  # {gid: {trigger1: response1, ...}, ...}
 group_settings = {}  # {gid: row}
 message_time_log = {}  # {gid: {uid: deque}}
+
+
+def init_db():
+    return mysql.connector.connect(
+        host=config.DB_HOST,
+        user=config.DB_USER,
+        passwd=config.DB_PASS,
+        database=config.DB_NAME,
+        pool_size=4,
+        pool_name="infinidee",
+        auth_plugin='mysql_native_password',
+        # charset='utf8mb4'
+    )
+
+
+def get_cursor():
+    global db_conn
+    try:
+        db_conn.ping(reconnect=True, attempts=3, delay=5)
+    except mysql.connector.Error as err:
+        # reconnect your cursor as you did in __init__ or wherever
+        db_conn = init_db()
+    return db_conn.cursor()
 
 
 def get_admin_ids(bot, chat_id):
@@ -462,6 +476,8 @@ def same_day(t1, t2):
 
 def main():
     # auto responders
+    global db_conn
+    db_conn = init_db()
     db_cursor = db_conn.cursor()
     db_cursor.execute("SELECT gid, msg_type, msg_text, `trigger`, entities FROM auto_response")
     while True:
