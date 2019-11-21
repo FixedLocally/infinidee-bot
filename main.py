@@ -11,6 +11,7 @@ from telegram import Update, Message, Bot, ChatPermissions, MessageEntity
 from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters, CallbackContext, DispatcherHandlerStop)
 
 import config
+from models import *
 
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -19,7 +20,7 @@ admin_cache = {}
 cache_timeouts = {}
 db_conn = None
 auto_responders = {}  # {gid: {trigger1: response1, ...}, ...}
-group_settings = {}  # {gid: row}
+group_settings_cache = {}  # {gid: row}
 message_time_log = {}  # {gid: {uid: deque}}
 
 
@@ -87,7 +88,7 @@ def on_member_join(update: Update, context: CallbackContext):
         chat_id = chat.id
         result = None
         try:
-            result = group_settings[chat_id]
+            result = group_settings_cache[chat_id]
         except KeyError:
             pass
         if result is not None:
@@ -108,8 +109,8 @@ def on_message(update: Update, context: CallbackContext):
     if message is None:
         return
     # anti-spam
-    threshold = group_settings[chat_id][1]
-    action = group_settings[chat_id][2]
+    threshold = group_settings_cache[chat_id].flood_threshold
+    action = group_settings_cache[chat_id].flood_action
     sender = message.from_user.id
     group_msg_log = {}
     try:
@@ -322,9 +323,9 @@ def cmd_unmute(update: Update, context: CallbackContext):
 def cmd_welcome(update: Update, context: CallbackContext):
     chat_id = update.effective_chat.id
     msg = update.message.text.split(" ")
-    group_settings[chat_id][1] = " ".join(msg[1::])
-    args = [chat_id]
-    args.extend(group_settings[chat_id][1:])
+    group_settings_cache[chat_id].welcome = " ".join(msg[1::])
+    args = [chat_id, group_settings_cache[chat_id].welcome, group_settings_cache[chat_id].flood_threshold,
+            group_settings_cache[chat_id].flood_action]
     db_cursor = db_conn.cursor()
     db_cursor.execute("REPLACE INTO group_settings (gid, welcome, flood_threshold, flood_action) VALUES (%s, %s, %s, %s)",
                       args)
@@ -492,7 +493,7 @@ def main():
         row = db_cursor.fetchone()
         if row is None:
             break
-        group_settings[row[0]] = row[1:]
+        group_settings_cache[row[0]] = GroupSettings(row[1:])
 
     # handlers
     updater = Updater(config.BOT_TOKEN, use_context=True)
