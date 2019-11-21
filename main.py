@@ -2,6 +2,7 @@
 import collections
 import json
 import logging
+import random
 import re
 import time
 from functools import wraps
@@ -149,10 +150,11 @@ def on_message(update: Update, context: CallbackContext):
         return
     msg = msg.lower()
     try:
-        response = auto_responders[chat_id][msg]
+        responders = auto_responders[chat_id][msg]
     except KeyError:
         return
-    if response is not None:
+    if responders is not None:
+        response = responders[random.randint(0, len(responders) - 1)]
         msg_type = response['msg_type']
         msg_text = response['msg_text']
         if msg_type == 'text':
@@ -432,12 +434,12 @@ def add_response_trigger(chat_id, msg_type, msg_text, trigger, stored_entities):
         responders = auto_responders[chat_id]
     except KeyError:
         auto_responders[chat_id] = responders
-    responders[trigger] = {}
-    responders[trigger]['msg_type'] = msg_type
-    responders[trigger]['msg_text'] = msg_text
-    responders[trigger]['entities'] = None
+    if trigger not in responders:
+        responders[trigger] = []
+    new_trigger = {'msg_type': msg_type, 'msg_text': msg_text, 'entities': None}
     if stored_entities is not None:
-        responders[trigger]['entities'] = json.loads(stored_entities)
+        new_trigger['entities'] = json.loads(stored_entities)
+    responders[trigger].append(new_trigger)
 
 
 def is_emoji(c):
