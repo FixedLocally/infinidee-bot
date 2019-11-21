@@ -388,6 +388,21 @@ def cmd_respond(update: Update, context: CallbackContext):
         reply(update.message, context.bot, "Auto responder set")
 
 
+@restricted
+def cmd_responders(update: Update, context: CallbackContext):
+    trigger = " ".join(context.args[1:])
+    chat_id = update.effective_chat.id
+    try:
+        responders = auto_responders[chat_id][trigger]
+    except KeyError:
+        reply(update.effective_message, context.bot, "No responders")
+        return
+    response = f'Response for {trigger}:'
+    for responder in responders:
+        response += responder['text'] + '\n'
+    reply(update.effective_message, context.bot, response)
+
+
 def cmd_schedule(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
     db_cursor = db_conn.cursor()
@@ -508,6 +523,7 @@ def main():
     updater.dispatcher.add_handler(CommandHandler('welcome', cmd_welcome))
     updater.dispatcher.add_handler(CommandHandler('log', cmd_log))
     updater.dispatcher.add_handler(CommandHandler('respond', cmd_respond))
+    updater.dispatcher.add_handler(CommandHandler('responders', cmd_responders))
     updater.dispatcher.add_handler(CommandHandler('schedule', cmd_schedule))
     updater.dispatcher.add_handler(MessageHandler(Filters.status_update.new_chat_members, on_member_join))
     updater.dispatcher.add_handler(MessageHandler(None, on_message))
