@@ -154,7 +154,7 @@ def on_message(update: Update, context: CallbackContext):
     except KeyError:
         return
     if responders is not None:
-        response = responders[random.randint(0, len(responders) - 1)]
+        response = random.choice(responders)
         msg_type = response['msg_type']
         msg_text = response['msg_text']
         if msg_type == 'text':
