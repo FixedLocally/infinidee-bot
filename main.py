@@ -394,7 +394,7 @@ def cmd_respond(update: Update, context: CallbackContext):
 def cmd_link(update: Update, context: CallbackContext):
     chat_id = update.effective_chat.id
     link = context.bot.export_chat_invite_link(chat_id)
-    reply(update.effective_message, context.bot, link)
+    reply(update.effective_message, context.bot, link, disable_web_page_preview=True)
 
 
 @restricted
