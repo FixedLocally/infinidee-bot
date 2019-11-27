@@ -390,6 +390,20 @@ def cmd_respond(update: Update, context: CallbackContext):
         reply(update.message, context.bot, "Auto responder set")
 
 
+@restricted
+def cmd_link(update: Update, context: CallbackContext):
+    chat_id = update.effective_chat.id
+    link = context.bot.export_chat_invite_link(chat_id)
+    reply(update.effective_message, context.bot, link)
+
+
+@restricted
+def cmd_revoke(update: Update, context: CallbackContext):
+    chat_id = update.effective_chat.id
+    context.bot.export_chat_invite_link(chat_id)
+    reply(update.effective_message, context.bot, "Ok")
+
+
 def cmd_schedule(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
     db_cursor = db_conn.cursor()
@@ -511,6 +525,8 @@ def main():
     updater.dispatcher.add_handler(CommandHandler('log', cmd_log))
     updater.dispatcher.add_handler(CommandHandler('respond', cmd_respond))
     updater.dispatcher.add_handler(CommandHandler('schedule', cmd_schedule))
+    updater.dispatcher.add_handler(CommandHandler('link', cmd_link))
+    updater.dispatcher.add_handler(CommandHandler('revoke', cmd_revoke))
     updater.dispatcher.add_handler(MessageHandler(Filters.status_update.new_chat_members, on_member_join))
     updater.dispatcher.add_handler(MessageHandler(None, on_message))
 
