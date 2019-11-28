@@ -92,7 +92,7 @@ def on_member_join(update: Update, context: CallbackContext):
         if chat_id in group_settings_cache:
             result = group_settings_cache[chat_id]
             if result is not None:
-                welcome = result[0]
+                welcome = result.welcome
                 for user in update.message.new_chat_members:
                     msg = welcome\
                         .replace('{{lastName}}', user.last_name or "")\
