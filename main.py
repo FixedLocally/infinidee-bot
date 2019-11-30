@@ -43,10 +43,10 @@ def init_db():
 def get_cursor():
     global db_conn
     try:
-        db_conn.ping(reconnect=True, attempts=3, delay=5)
+        return db_conn.cursor()
     except:
         # reconnect your cursor as you did in __init__ or wherever
-        db_conn = init_db()
+        init_db()
     return db_conn.cursor()
 
 
@@ -210,7 +210,7 @@ def cmd_start(update: Update, context: CallbackContext):
 def cmd_bulletin(update: Update, context: CallbackContext):
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
-    db_cursor = db_conn.cursor()
+    db_cursor = get_cursor()
     if update.message.reply_to_message:
         if user_id in get_admin_ids(context.bot, chat_id):
             # add message to bulletin
@@ -328,7 +328,7 @@ def cmd_welcome(update: Update, context: CallbackContext):
     group_settings_cache[chat_id].welcome = " ".join(msg[1::])
     args = [chat_id, group_settings_cache[chat_id].welcome, group_settings_cache[chat_id].flood_threshold,
             group_settings_cache[chat_id].flood_action]
-    db_cursor = db_conn.cursor()
+    db_cursor = get_cursor()
     db_cursor.execute("REPLACE INTO group_settings (gid, welcome, flood_threshold, flood_action) VALUES (%s, %s, %s, %s)",
                       args)
     db_conn.commit()
@@ -383,7 +383,7 @@ def cmd_respond(update: Update, context: CallbackContext):
                 stored_entities_list.append([e_type, entity.offset - offset_adjustment, len(entities[i].rstrip()), ""])
         stored_entities = json.dumps(stored_entities_list)
         add_response_trigger(chat_id, msg_type, msg_text, trigger, stored_entities)
-        db_cursor = db_conn.cursor()
+        db_cursor = get_cursor()
         db_cursor.execute("INSERT INTO auto_response (gid, msg_type, msg_text, `trigger`, entities) VALUES (%s, %s, %s, %s, %s)",
                           [chat_id, msg_type, msg_text, trigger, stored_entities])
         db_conn.commit()
@@ -406,7 +406,7 @@ def cmd_revoke(update: Update, context: CallbackContext):
 
 def cmd_schedule(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
-    db_cursor = db_conn.cursor()
+    db_cursor = get_cursor()
     if user_id in config.SCHEDULE_ADMIN:
         if len(context.args) > 2:
             # add to schedule
@@ -495,7 +495,7 @@ def main():
     # auto responders
     global db_conn
     db_conn = init_db()
-    db_cursor = db_conn.cursor()
+    db_cursor = get_cursor()
     db_cursor.execute("SELECT gid, msg_type, msg_text, `trigger`, entities FROM auto_response")
     while True:
         row = db_cursor.fetchone()
