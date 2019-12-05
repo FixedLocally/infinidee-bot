@@ -221,6 +221,7 @@ def cmd_bulletin(update: Update, context: CallbackContext):
                     time_limit = int(text[1])
                 except ValueError:
                     reply(update.message, context.bot, f'{text[1]} is not a valid number')
+                    db_cursor.close()
                     return
             db_cursor.execute("SELECT 1 from bulletin WHERE gid=%s and msg_id=%s", [chat_id, update.message.reply_to_message.message_id])
             result = db_cursor.fetchall()
@@ -234,6 +235,7 @@ def cmd_bulletin(update: Update, context: CallbackContext):
                                   [chat_id, update.message.reply_to_message.text + ' ~' + update.message.reply_to_message.from_user.first_name, time_limit, update.message.reply_to_message.message_id])
                 db_conn.commit()
                 reply(update.message, context.bot, "Added to bulletin")
+            db_cursor.close()
             return
     db_cursor.execute("SELECT content, msg_id from bulletin where gid=%s and expires>unix_timestamp() ORDER BY id",
                       [chat_id])
@@ -258,6 +260,7 @@ def cmd_bulletin(update: Update, context: CallbackContext):
         i += 1
     if len(result) > 0:
         reply(update.message, context.bot, bulletin, parse_mode="markdown")
+    db_cursor.close()
 
 
 def cmd_log(update: Update, context: CallbackContext):
@@ -333,6 +336,7 @@ def cmd_welcome(update: Update, context: CallbackContext):
                       args)
     db_conn.commit()
     reply(update.message, context.bot, "Welcome message set")
+    db_cursor.close()
 
 
 @restricted
@@ -388,6 +392,7 @@ def cmd_respond(update: Update, context: CallbackContext):
                           [chat_id, msg_type, msg_text, trigger, stored_entities])
         db_conn.commit()
         reply(update.message, context.bot, "Auto responder set")
+        db_cursor.close()
 
 
 @restricted
@@ -416,6 +421,7 @@ def cmd_schedule(update: Update, context: CallbackContext):
             event = args[3]
             if start_date > end_date:
                 reply(update.message, context.bot, 'Error: event ends before starting')
+                db_cursor.close()
                 return
             db_cursor.execute("INSERT INTO schedule (start_time, end_time, event) VALUES (%s, %s, %s)",
                               [start_date, end_date, event])
@@ -440,6 +446,7 @@ def cmd_schedule(update: Update, context: CallbackContext):
         msg += row[3]
         msg += '\n\n'
     reply(update.message, context.bot, msg)
+    db_cursor.close()
 
 
 def add_response_trigger(chat_id, msg_type, msg_text, trigger, stored_entities):
@@ -511,6 +518,7 @@ def main():
             break
         group_settings_cache[row[0]] = GroupSettings(row[1:])
 
+    db_cursor.close()
     # handlers
     updater = Updater(config.BOT_TOKEN, use_context=True)
     updater.dispatcher.add_handler(CommandHandler('start', cmd_start))
