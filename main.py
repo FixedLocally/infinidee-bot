@@ -109,6 +109,9 @@ def on_message(update: Update, context: CallbackContext):
     if message is None:
         return
     # anti-spam
+    if message.reply_markup and message.reply_markup.inline_keyboard:
+        if message.text.startswith('🔒 A whisper message to '):
+            message.delete()
     if chat_id in group_settings_cache:
         threshold = group_settings_cache[chat_id].flood_threshold
         action = group_settings_cache[chat_id].flood_action
