@@ -295,7 +295,17 @@ def cmd_ban(update: Update, context: CallbackContext):
 def cmd_unban(update: Update, context: CallbackContext):
     if update.message.reply_to_message:
         replied = update.message.reply_to_message
-        context.bot.unban_chat_member(replied.chat_id, replied.from_user.id)
+        # context.bot.unban_chat_member(replied.chat_id, replied.from_user.id)
+        context.bot.restrict_chat_member(replied.chat_id, replied.from_user.id, ChatPermissions(
+            can_add_web_page_previews=True,
+            can_change_info=True,
+            can_invite_users=True,
+            can_pin_messages=True,
+            can_send_media_messages=True,
+            can_send_messages=True,
+            can_send_other_messages=True,
+            can_send_polls=True
+        ))
         logger.log(logging.INFO, f'{update.effective_user.id} has used /unban against {replied.from_user.id}')
 
 
